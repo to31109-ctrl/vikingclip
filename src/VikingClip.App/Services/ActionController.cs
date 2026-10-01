@@ -337,9 +337,15 @@ public sealed class ActionController
             var uploadProgress = new Progress<double>(f => Toast.Progress($"Uploading to {ch.Name}…", $"{f * 100:0}%", f));
             var res = await DiscordWebhook.UploadAsync(ch.GetWebhookUrl(), upload, message, ch.PosterName, uploadProgress);
             if (res.Success)
+            {
+                Log.Info($"Posted {Path.GetFileName(upload)} ({FileNames.HumanSize(new FileInfo(upload).Length)}) to {ch.Name}: {res.AttachmentUrl}");
                 Toast.Show(ToastKind.Success, $"Posted to {ch.Name}", gameName);
+            }
             else
+            {
+                Log.Warn($"Discord post to {ch.Name} failed: {res.Error}");
                 Toast.Show(ToastKind.Error, $"Discord post failed", res.Error, duration: TimeSpan.FromSeconds(8));
+            }
         }
         catch (Exception ex)
         {
