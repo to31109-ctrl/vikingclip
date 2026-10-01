@@ -68,9 +68,10 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="18" Height="18" CornerRadius="4" Background="{StaticResource AccentBrush}" Margin="0,0,8,0">
-                        <TextBlock Text="V" FontFamily="{StaticResource DisplayFont}" FontWeight="Bold" FontSize="12"
-                                   Foreground="{StaticResource OnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Border Width="18" Height="18" CornerRadius="4" Margin="0,0,8,0">
+                        <Border.Background>
+                            <ImageBrush ImageSource="pack://application:,,,/Assets/icon.png" Stretch="UniformToFill" />
+                        </Border.Background>
                     </Border>
                     <TextBlock Text="VikingClip" Style="{StaticResource H2}" VerticalAlignment="Center" />
                 </StackPanel>

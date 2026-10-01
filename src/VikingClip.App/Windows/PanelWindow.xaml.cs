@@ -28,6 +28,7 @@ public partial class PanelWindow : Window
         InitializeComponent();
         SourceInitialized += (_, _) =>
         {
+            if (SnapshotMode) return; // dev renders: plain invisible window, no capture exclusion
             WindowNative.ExcludeFromCapture(this);
             WindowNative.MakeOverlay(this, noActivate: false);
         };
@@ -42,6 +43,11 @@ public partial class PanelWindow : Window
     }
 
     private DateTime _shownAt;
+
+    /// <summary>Dev snapshots: skip positioning and focus stealing.</summary>
+    public bool SnapshotMode { get; set; }
+
+    internal void ChooseForSnapshot(PanelAction action) => Choose(action);
 
     public void ShowFor(Moment moment)
     {
@@ -63,6 +69,7 @@ public partial class PanelWindow : Window
         DestinationStep.Visibility = Visibility.Collapsed;
 
         Show();
+        if (SnapshotMode) return;
         if (moment.Monitor is not null)
         {
             WindowNative.CenterOnMonitor(this, moment.Monitor.Bounds);

@@ -62,6 +62,14 @@ public partial class App : Application
         Actions = new ActionController(this);
         Tray = new TrayService(this);
 
+        var snap = Array.IndexOf(e.Args, "--ui-snapshots");
+        if (snap >= 0)
+        {
+            var dir = e.Args.Length > snap + 1 ? e.Args[snap + 1] : Path.Combine(Core.Paths.TempDir, "ui");
+            _ = UiSnapshots.RunAsync(this, dir);
+            return;
+        }
+
         Hotkeys.Pressed += name => Actions.OnHotkey(name);
         Hotkeys.DisplayChanged += () => Engine.NotifyDisplayChange();
         ApplyHotkeys();

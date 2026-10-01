@@ -16,6 +16,9 @@ public partial class ToastWindow : Window
     private readonly DispatcherTimer _hide = new();
     private Action? _onClick;
 
+    /// <summary>Dev snapshots: skip positioning.</summary>
+    public bool SnapshotMode { get; set; }
+
     public ToastWindow(Func<RECT> monitorRect, Func<bool> enabled)
     {
         _monitor = monitorRect;
@@ -23,6 +26,7 @@ public partial class ToastWindow : Window
         InitializeComponent();
         SourceInitialized += (_, _) =>
         {
+            if (SnapshotMode) return; // dev renders: plain invisible window, no capture exclusion
             WindowNative.ExcludeFromCapture(this);
             WindowNative.MakeOverlay(this, noActivate: true);
         };
@@ -65,8 +69,11 @@ public partial class ToastWindow : Window
 
         if (!IsVisible) Show();
         UpdateLayout();
-        WindowNative.PlaceAtCorner(this, _monitor(), WindowNative.Corner.BottomRight, 24);
-        WindowNative.Topmost(this);
+        if (!SnapshotMode)
+        {
+            WindowNative.PlaceAtCorner(this, _monitor(), WindowNative.Corner.BottomRight, 24);
+            WindowNative.Topmost(this);
+        }
 
         _hide.Stop();
         if (autoHide is { } d)

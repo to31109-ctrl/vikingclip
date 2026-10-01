@@ -15,9 +15,10 @@
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top" Margin="18,18,18,10">
                     <StackPanel Orientation="Horizontal">
-                        <Border Width="26" Height="26" CornerRadius="6" Background="{StaticResource AccentBrush}" Margin="0,0,10,0">
-                            <TextBlock Text="V" FontFamily="{StaticResource DisplayFont}" FontWeight="Bold" FontSize="15"
-                                       Foreground="{StaticResource OnAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border Width="26" Height="26" CornerRadius="6" Margin="0,0,10,0" ClipToBounds="True">
+                            <Border.Background>
+                                <ImageBrush ImageSource="pack://application:,,,/Assets/icon.png" Stretch="UniformToFill" />
+                            </Border.Background>
                         </Border>
                         <TextBlock Text="VikingClip" Style="{StaticResource H2}" FontSize="16" VerticalAlignment="Center" />
                     </StackPanel>
