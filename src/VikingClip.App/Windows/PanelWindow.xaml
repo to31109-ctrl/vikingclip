@@ -57,8 +57,8 @@
         </Style>
     </Window.Resources>
 
-    <Border Width="430" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderStrongBrush}"
-            BorderThickness="1" CornerRadius="10" Padding="18,14,18,14" SnapsToDevicePixels="True">
+    <Border x:Name="Root" Width="430" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderStrongBrush}"
+            BorderThickness="1" CornerRadius="10" Padding="18,14,18,14" SnapsToDevicePixels="True" RenderTransformOrigin="0.5,0.5">
         <StackPanel>
             <!-- header -->
             <Grid Margin="0,0,0,14">
@@ -95,7 +95,7 @@
                     <Button x:Name="RecordTile" Style="{StaticResource Tile}" Margin="3,0,3,0" Click="Record_Click">
                         <StackPanel>
                             <TextBlock x:Name="RecordGlyph" Text="&#xE7C8;" Style="{StaticResource Icon}" FontSize="22" Foreground="{StaticResource RecordBrush}" Margin="0,0,0,8" />
-                            <TextBlock x:Name="RecordLabel" Text="Record" Style="{StaticResource Body}" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="RecordLabel" Text="Record" Style="{StaticResource Body}" HorizontalAlignment="Center" Typography.NumeralAlignment="Tabular" />
                             <Border Style="{StaticResource KeyHint}" HorizontalAlignment="Center" Margin="0,8,0,0">
                                 <TextBlock Text="2" Style="{StaticResource KeyHintText}" />
                             </Border>
@@ -118,7 +118,7 @@
             <StackPanel x:Name="DestinationStep" Visibility="Collapsed">
                 <Grid Margin="0,0,0,10">
                     <TextBlock x:Name="DestTitle" Text="Save clip to" Style="{StaticResource H2}" VerticalAlignment="Center" />
-                    <Button Style="{StaticResource GhostButton}" Content="Back" HorizontalAlignment="Right" Click="Back_Click" />
+                    <Button x:Name="BackButton" Style="{StaticResource GhostButton}" Content="Back" HorizontalAlignment="Right" Click="Back_Click" />
                 </Grid>
                 <ItemsControl x:Name="DestList" />
                 <CheckBox x:Name="RememberBox" Content="Remember my choice and skip this step" Margin="2,6,0,0" FontSize="12" />

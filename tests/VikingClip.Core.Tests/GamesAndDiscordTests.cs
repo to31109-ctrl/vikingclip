@@ -102,9 +102,9 @@ public class GamesAndDiscordTests
         var limit = 10L * 1024 * 1024;
         var p = DiscordCompressor.MakePlan(45, limit, 1920, 1080, 60);
         Assert.True(p.EstimatedBytes(45) <= limit, $"{p.EstimatedBytes(45)} > {limit}");
-        Assert.Equal(720, p.Height);
-        Assert.Equal(1280, p.Width);
-        Assert.Equal(30, p.Fps);
+        Assert.Equal(540, p.Height);   // resolution gives way, frame rate stays
+        Assert.Equal(960, p.Width);
+        Assert.Equal(60, p.Fps);
         Assert.InRange(p.VideoKbps, 1200, 1800);
 
         var big = DiscordCompressor.MakePlan(45, 100L * 1024 * 1024, 2560, 1440, 60);
@@ -114,7 +114,8 @@ public class GamesAndDiscordTests
 
         // Ten minutes cannot fit in 10 MB at a watchable bitrate: the plan bottoms out at the floor.
         var longRec = DiscordCompressor.MakePlan(600, limit, 1920, 1080, 60);
-        Assert.Equal(360, longRec.Height);
+        Assert.Equal(480, longRec.Height);
+        Assert.Equal(60, longRec.Fps);
         Assert.Equal(150, longRec.VideoKbps);
         Assert.Equal(64, longRec.AudioKbps);
     }
@@ -122,10 +123,11 @@ public class GamesAndDiscordTests
     [Fact]
     public void Auto_bitrate_scales_with_resolution()
     {
-        Assert.Equal(20000, FfmpegArgs.AutoBitrateKbps(1920, 1080, 60));
-        Assert.InRange(FfmpegArgs.AutoBitrateKbps(2560, 1440, 60), 34000, 37000);
-        Assert.InRange(FfmpegArgs.AutoBitrateKbps(1920, 1080, 30), 12000, 14000);
-        Assert.Equal(4000, FfmpegArgs.AutoBitrateKbps(640, 480, 30)); // clamp floor
+        Assert.Equal(40000, FfmpegArgs.AutoBitrateKbps(1920, 1080, 60));
+        Assert.InRange(FfmpegArgs.AutoBitrateKbps(2560, 1440, 60), 69000, 73000);
+        Assert.InRange(FfmpegArgs.AutoBitrateKbps(1920, 1080, 30), 25000, 28000);
+        Assert.Equal(8000, FfmpegArgs.AutoBitrateKbps(640, 480, 30)); // clamp floor
+        Assert.Equal(120000, FfmpegArgs.AutoBitrateKbps(3840, 2160, 60)); // clamp ceiling
     }
 
     [Fact]

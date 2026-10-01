@@ -10,7 +10,7 @@
     <Color x:Key="BorderStrongColor">#3A414D</Color>
     <Color x:Key="TextColor">#E8EBF0</Color>
     <Color x:Key="TextMutedColor">#8B93A1</Color>
-    <Color x:Key="TextFaintColor">#5C6573</Color>
+    <Color x:Key="TextFaintColor">#6F7887</Color>
     <Color x:Key="AccentColor">#2FD1B0</Color>
     <Color x:Key="AccentHoverColor">#4BDDC0</Color>
     <Color x:Key="AccentPressedColor">#26B898</Color>
@@ -46,18 +46,21 @@
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
     <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas, Courier New</FontFamily>
 
-    <!-- Typography -->
+    <!-- Typography: light text on dark gets a little more leading than the default. -->
     <Style x:Key="Body" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="LineHeight" Value="19" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
     </Style>
     <Style x:Key="Muted" TargetType="TextBlock" BasedOn="{StaticResource Body}">
         <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
     </Style>
     <Style x:Key="Caption" TargetType="TextBlock" BasedOn="{StaticResource Body}">
         <Setter Property="FontSize" Value="12" />
+        <Setter Property="LineHeight" Value="17" />
         <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
     </Style>
     <Style x:Key="Label" TargetType="TextBlock" BasedOn="{StaticResource Body}">
@@ -68,11 +71,13 @@
     <Style x:Key="H1" TargetType="TextBlock" BasedOn="{StaticResource Body}">
         <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
         <Setter Property="FontSize" Value="22" />
+        <Setter Property="LineHeight" Value="28" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style x:Key="H2" TargetType="TextBlock" BasedOn="{StaticResource Body}">
         <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
         <Setter Property="FontSize" Value="15" />
+        <Setter Property="LineHeight" Value="20" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style x:Key="Icon" TargetType="TextBlock">

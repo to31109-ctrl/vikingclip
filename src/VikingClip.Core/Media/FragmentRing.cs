@@ -20,7 +20,7 @@ public sealed class FragmentRing
         {
             _maxSeconds = value;
             // Hard byte cap in case timing ever goes wrong: generous for the configured length, never unbounded.
-            MaxBytes = Math.Max(200L * 1024 * 1024, EstimateBytes(value, 100_000));
+            MaxBytes = Math.Max(200L * 1024 * 1024, EstimateBytes(value, 200_000));
         }
     }
 

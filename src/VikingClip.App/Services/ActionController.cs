@@ -17,7 +17,7 @@ namespace VikingClip.App.Services;
 
 public enum PanelAction { Clip, Record, StopRecording, Screenshot }
 
-/// <summary>Where a clip goes: this PC only, or this PC + a Discord channel.</summary>
+/// <summary>Where something goes: this PC, or a Discord channel (Discord only - nothing is kept locally unless the post fails).</summary>
 public sealed record Destination(string Id, DiscordChannel? Channel)
 {
     public static readonly Destination Local = new("local", null);
@@ -35,6 +35,15 @@ public sealed class Moment
     public MonitorInfo? Monitor { get; init; }
     public MonitorCapture? Capture { get; init; }
     public Task<Bitmap?> Screenshot { get; init; } = Task.FromResult<Bitmap?>(null);
+}
+
+/// <summary>A recording that has been stopped and is being written while the user picks a destination.</summary>
+public sealed class PendingRecording
+{
+    public required RecordingSession Session { get; init; }
+    public required Task<ClipResult> Mux { get; init; }
+    public required GameInfo Game { get; init; }
+    public MonitorInfo? Monitor { get; init; }
 }
 
 /// <summary>Turns hotkeys and panel choices into clips, recordings, screenshots and Discord posts.</summary>
@@ -98,6 +107,8 @@ public sealed class ActionController
         return new Moment { Time = time, When = DateTime.Now, Foreground = fg, Game = game, Monitor = monitor, Capture = capture, Screenshot = shot };
     }
 
+    private PanelWindow Panel => _panel ??= new PanelWindow(this);
+
     public void TogglePanel()
     {
         if (_panel is { IsVisible: true })
@@ -105,9 +116,7 @@ public sealed class ActionController
             _panel.CloseAndRestore();
             return;
         }
-        var moment = Snapshot(grabScreenshot: true);
-        _panel ??= new PanelWindow(this);
-        _panel.ShowFor(moment);
+        Panel.ShowFor(Snapshot(grabScreenshot: true));
     }
 
     public void ClosePanel() => _panel?.CloseAndRestore();
@@ -150,7 +159,7 @@ public sealed class ActionController
         PanelAction.Clip => SaveClipAsync(m, dest),
         PanelAction.Screenshot => SaveScreenshotAsync(m, dest),
         PanelAction.Record => StartRecordingAsync(m),
-        PanelAction.StopRecording => StopRecordingAsync(dest),
+        PanelAction.StopRecording => BeginStopRecording() is { } p ? FinishRecordingAsync(p, dest) : Task.CompletedTask,
         _ => Task.CompletedTask,
     };
 
@@ -158,7 +167,21 @@ public sealed class ActionController
 
     public Task InstantScreenshotAsync() => SaveScreenshotAsync(Snapshot(true), DefaultDestination());
 
-    public Task ToggleRecordingAsync() => IsRecording ? StopRecordingAsync(DefaultDestination()) : StartRecordingAsync(Snapshot(false));
+    /// <summary>Record hotkey: start, or stop and ask where the recording should go.</summary>
+    public async Task ToggleRecordingAsync()
+    {
+        if (!IsRecording)
+        {
+            await StartRecordingAsync(Snapshot(false));
+            return;
+        }
+        var moment = Snapshot(false);
+        var pending = BeginStopRecording();
+        if (pending is null) return;
+        Panel.AskDestination(moment, PanelAction.StopRecording,
+            onPick: dest => _ = FinishRecordingAsync(pending, dest),
+            onDismiss: () => _ = FinishRecordingAsync(pending, Destination.Local));
+    }
 
     public async Task SaveClipAsync(Moment m, Destination dest)
     {
@@ -168,9 +191,13 @@ public sealed class ActionController
             Toast.Show(ToastKind.Error, "Capture isn't running", Engine.StatusText);
             return;
         }
-        var path = FileNames.BuildOutputPath(s.ClipsRoot, m.Game.FolderName, m.Game.Label, ".mp4", m.When);
+
+        var finalPath = FileNames.BuildOutputPath(s.ClipsRoot, m.Game.FolderName, m.Game.Label, ".mp4", m.When);
+        // Discord-only: build the clip in a temp folder so nothing is left on this PC after a successful post.
+        var workPath = dest.IsLocal ? finalPath : Path.Combine(Paths.NewTempDir("post"), Path.GetFileName(finalPath));
+
         Toast.Progress("Saving clip…", m.Game.Name);
-        var r = await Engine.SaveClipAsync(m.Capture, m.Time, s.ClipLengthSeconds, path);
+        var r = await Engine.SaveClipAsync(m.Capture, m.Time, s.ClipLengthSeconds, workPath);
         if (!r.Success)
         {
             Toast.Show(ToastKind.Error, "Clip failed", r.Error);
@@ -185,14 +212,16 @@ public sealed class ActionController
             Encoder = m.Capture.Plan.Id,
             CreatedLocal = m.When,
         };
-        _app.Library.Record(path, meta);
-        LibraryChanged?.Invoke();
-        Toast.Show(ToastKind.Success, "Clip saved",
-            $"{m.Game.Name} · {FileNames.HumanDuration(r.DurationSeconds)} · {FileNames.HumanSize(r.Bytes)}{(r.Truncated ? " · shortened (capture restarted)" : "")}",
-            onClick: () => App.RevealInExplorer(path));
+        var summary = $"{m.Game.Name} · {FileNames.HumanDuration(r.DurationSeconds)} · {FileNames.HumanSize(r.Bytes)}{(r.Truncated ? " · shortened (capture restarted)" : "")}";
 
-        if (dest.Channel is { } ch)
-            await PostToDiscordAsync(path, ch, meta, m.Game.Name, m.Monitor);
+        if (dest.IsLocal)
+        {
+            RecordLocal(finalPath, meta);
+            Toast.Show(ToastKind.Success, "Clip saved", summary, onClick: () => App.RevealInExplorer(finalPath));
+            return;
+        }
+
+        await DeliverToDiscordAsync(workPath, finalPath, dest.Channel!, meta, m.Game.Name, m.Monitor, summary);
     }
 
     public async Task SaveScreenshotAsync(Moment m, Destination dest)
@@ -211,20 +240,26 @@ public sealed class ActionController
             Toast.Show(ToastKind.Error, "Screenshot failed", "Could not read the screen.");
             return;
         }
-        var path = FileNames.BuildOutputPath(s.ClipsRoot, m.Game.FolderName, m.Game.Label, ".png", m.When);
+
+        var finalPath = FileNames.BuildOutputPath(s.ClipsRoot, m.Game.FolderName, m.Game.Label, ".png", m.When);
+        var workPath = dest.IsLocal ? finalPath : Path.Combine(Paths.NewTempDir("post"), Path.GetFileName(finalPath));
         try
         {
-            await Task.Run(() => ScreenshotGrabber.SavePng(bmp, path));
+            await Task.Run(() => ScreenshotGrabber.SavePng(bmp, workPath));
         }
         finally { bmp.Dispose(); }
 
         var meta = new ClipMeta { Kind = MediaKind.Screenshot, Game = m.Game.FolderName, Monitor = m.Monitor?.DeviceName, CreatedLocal = m.When };
-        _app.Library.Record(path, meta);
-        LibraryChanged?.Invoke();
-        Toast.Show(ToastKind.Success, "Screenshot saved", $"{m.Game.Name} · {FileNames.HumanSize(new FileInfo(path).Length)}", onClick: () => App.RevealInExplorer(path));
+        var summary = $"{m.Game.Name} · {FileNames.HumanSize(new FileInfo(workPath).Length)}";
 
-        if (dest.Channel is { } ch)
-            await PostToDiscordAsync(path, ch, meta, m.Game.Name, m.Monitor);
+        if (dest.IsLocal)
+        {
+            RecordLocal(finalPath, meta);
+            Toast.Show(ToastKind.Success, "Screenshot saved", summary, onClick: () => App.RevealInExplorer(finalPath));
+            return;
+        }
+
+        await DeliverToDiscordAsync(workPath, finalPath, dest.Channel!, meta, m.Game.Name, m.Monitor, summary);
     }
 
     public async Task StartRecordingAsync(Moment m)
@@ -238,11 +273,11 @@ public sealed class ActionController
         var s = Settings.Current;
         var path = FileNames.BuildOutputPath(s.ClipsRoot, m.Game.FolderName, $"{m.Game.Label} Recording", ".mp4", m.When);
         _recording = Engine.StartRecording(m.Capture, path, m.Game.Label);
-        _recording.LowDiskSpace += (rec, reason) => _app.Dispatcher.BeginInvoke(async () =>
+        _recording.LowDiskSpace += (rec, reason) => _app.Dispatcher.BeginInvoke(() =>
         {
             if (!ReferenceEquals(rec, _recording)) return;
             Toast.Show(ToastKind.Error, "Recording stopped", reason + " - saving what was recorded.", duration: TimeSpan.FromSeconds(8));
-            await StopRecordingAsync(null);
+            if (BeginStopRecording() is { } p) _ = FinishRecordingAsync(p, Destination.Local);
         });
         _recordingGame = m.Game;
         _recordingMonitor = m.Monitor;
@@ -252,47 +287,94 @@ public sealed class ActionController
             _indicator ??= new RecordingIndicatorWindow();
             _indicator.ShowFor(_recording, m.Monitor.Bounds);
         }
-        Toast.Show(ToastKind.Info, "Recording started", $"{m.Game.Name} · press {s.Hotkeys.ToggleRecording} or Alt+K to stop");
+        Toast.Show(ToastKind.Info, "Recording started", $"{m.Game.Name} · {s.Hotkeys.ToggleRecording} or {s.Hotkeys.Panel} to stop");
         await Task.CompletedTask;
     }
 
-    public async Task StopRecordingAsync(Destination? dest)
+    /// <summary>Stops the recording at this instant and starts writing the file; the destination can be chosen meanwhile.</summary>
+    public PendingRecording? BeginStopRecording()
     {
         var rec = _recording;
-        if (rec is null) return;
+        if (rec is null) return null;
         _recording = null;
         RecordingChanged?.Invoke();
         _indicator?.HideIndicator();
         Toast.Progress("Saving recording…", _recordingGame?.Name);
-        var r = await rec.StopAsync();
+        return new PendingRecording
+        {
+            Session = rec,
+            Mux = rec.StopAsync(),
+            Game = _recordingGame ?? GameInfo.Desktop(null),
+            Monitor = _recordingMonitor,
+        };
+    }
+
+    public async Task FinishRecordingAsync(PendingRecording p, Destination dest)
+    {
+        Log.Info($"Recording destination: {dest.Label}");
+        var r = await p.Mux;
         if (!r.Success)
         {
             Toast.Show(ToastKind.Error, "Recording failed", r.Error);
             return;
         }
+        var path = p.Session.OutputPath;
         var meta = new ClipMeta
         {
             Kind = MediaKind.Recording,
-            Game = _recordingGame?.FolderName ?? Paths.DesktopFolderName,
+            Game = p.Game.FolderName,
             DurationSeconds = r.DurationSeconds,
-            Monitor = _recordingMonitor?.DeviceName,
-            Encoder = rec.Capture.Plan.Id,
+            Monitor = p.Monitor?.DeviceName,
+            Encoder = p.Session.Capture.Plan.Id,
             CreatedLocal = DateTime.Now,
         };
-        _app.Library.Record(rec.OutputPath, meta);
-        LibraryChanged?.Invoke();
-        Toast.Show(ToastKind.Success, "Recording saved",
-            $"{_recordingGame?.Name} · {FileNames.HumanDuration(r.DurationSeconds)} · {FileNames.HumanSize(r.Bytes)}",
-            onClick: () => App.RevealInExplorer(rec.OutputPath));
+        var summary = $"{p.Game.Name} · {FileNames.HumanDuration(r.DurationSeconds)} · {FileNames.HumanSize(r.Bytes)}";
 
-        if (dest?.Channel is { } ch)
-            await PostToDiscordAsync(rec.OutputPath, ch, meta, _recordingGame?.Name ?? "Desktop", _recordingMonitor);
+        if (dest.IsLocal)
+        {
+            RecordLocal(path, meta);
+            Toast.Show(ToastKind.Success, "Recording saved", summary, onClick: () => App.RevealInExplorer(path));
+            return;
+        }
+
+        // Recordings are always muxed into the clips folder (disk-bound); Discord-only removes the file after a good post.
+        await DeliverToDiscordAsync(path, path, dest.Channel!, meta, p.Game.Name, p.Monitor, summary);
     }
 
     // ---- Discord ------------------------------------------------------------------------------
 
-    /// <summary>Posts a saved file to a channel, compressing a copy first if it exceeds the channel's limit.</summary>
-    public async Task PostToDiscordAsync(string path, DiscordChannel ch, ClipMeta meta, string gameName, MonitorInfo? monitor)
+    /// <summary>
+    /// Discord-only delivery: post <paramref name="workPath"/>; on success delete it (nothing stays on this PC),
+    /// on failure keep it at <paramref name="keepPath"/> so nothing is lost.
+    /// </summary>
+    private async Task DeliverToDiscordAsync(string workPath, string keepPath, DiscordChannel ch, ClipMeta meta, string gameName, MonitorInfo? monitor, string summary)
+    {
+        var ok = await PostToDiscordAsync(workPath, ch, meta, gameName, monitor);
+        if (ok)
+        {
+            Toast.Show(ToastKind.Success, $"Posted to {ch.Name}", summary + " · not kept on this PC");
+            TryDelete(workPath);
+            return;
+        }
+        try
+        {
+            if (!string.Equals(workPath, keepPath, StringComparison.OrdinalIgnoreCase))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(keepPath)!);
+                File.Move(workPath, keepPath, true);
+                TryDelete(Path.GetDirectoryName(workPath)!);
+            }
+            RecordLocal(keepPath, meta);
+            Toast.Show(ToastKind.Error, $"Couldn't post to {ch.Name}", "Saved on this PC instead - send it from the Library when Discord is back.", onClick: () => App.RevealInExplorer(keepPath), duration: TimeSpan.FromSeconds(8));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Fallback save failed", ex);
+        }
+    }
+
+    /// <summary>Posts a file to a channel, compressing a copy first if it exceeds the channel's limit. Keeps the source file.</summary>
+    public async Task<bool> PostToDiscordAsync(string path, DiscordChannel ch, ClipMeta meta, string gameName, MonitorInfo? monitor)
     {
         var limit = (long)ch.MaxUploadMB * 1024 * 1024;
         var upload = path;
@@ -320,8 +402,9 @@ public sealed class ActionController
                     var (ok, err) = await DiscordCompressor.CompressAsync(path, temp, plan, duration, progress);
                     if (!ok)
                     {
+                        Log.Warn($"Compression for {ch.Name} failed: {err}");
                         Toast.Show(ToastKind.Error, "Couldn't compress for Discord", err);
-                        return;
+                        return false;
                     }
                     upload = temp;
                 }
@@ -339,23 +422,54 @@ public sealed class ActionController
             if (res.Success)
             {
                 Log.Info($"Posted {Path.GetFileName(upload)} ({FileNames.HumanSize(new FileInfo(upload).Length)}) to {ch.Name}: {res.AttachmentUrl}");
-                Toast.Show(ToastKind.Success, $"Posted to {ch.Name}", gameName);
+                return true;
             }
-            else
-            {
-                Log.Warn($"Discord post to {ch.Name} failed: {res.Error}");
-                Toast.Show(ToastKind.Error, $"Discord post failed", res.Error, duration: TimeSpan.FromSeconds(8));
-            }
+            Log.Warn($"Discord post to {ch.Name} failed: {res.Error}");
+            Toast.Show(ToastKind.Error, "Discord post failed", res.Error, duration: TimeSpan.FromSeconds(8));
+            return false;
         }
         catch (Exception ex)
         {
             Log.Error("Discord post failed", ex);
             Toast.Show(ToastKind.Error, "Discord post failed", ex.Message);
+            return false;
         }
         finally
         {
-            if (temp is not null) { try { File.Delete(temp); } catch { } }
+            if (temp is not null) TryDelete(temp);
         }
+    }
+
+    /// <summary>Library page: send an existing file to a channel (the file stays).</summary>
+    public async Task SendExistingToDiscordAsync(string path, DiscordChannel ch, ClipMeta meta, string gameName)
+    {
+        if (await PostToDiscordAsync(path, ch, meta, gameName, null))
+            Toast.Show(ToastKind.Success, $"Posted to {ch.Name}", Path.GetFileName(path));
+    }
+
+    private void RecordLocal(string path, ClipMeta meta)
+    {
+        _app.Library.Record(path, meta);
+        LibraryChanged?.Invoke();
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+                var dir = Path.GetDirectoryName(path);
+                if (dir is not null && dir.StartsWith(Paths.TempDir, StringComparison.OrdinalIgnoreCase) && !Directory.EnumerateFileSystemEntries(dir).Any())
+                    Directory.Delete(dir);
+            }
+            else if (Directory.Exists(path) && path.StartsWith(Paths.TempDir, StringComparison.OrdinalIgnoreCase))
+            {
+                Directory.Delete(path, true);
+            }
+        }
+        catch (Exception ex) { Log.Debug($"Cleanup skipped for {path}: {ex.Message}"); }
     }
 
     private static void SaveJpeg(string pngPath, string jpgPath, long quality)
@@ -381,7 +495,7 @@ public sealed class ActionController
     public async Task ShutdownAsync()
     {
         _panel?.Hide();
-        if (IsRecording) await StopRecordingAsync(null);
+        if (BeginStopRecording() is { } p) await FinishRecordingAsync(p, Destination.Local);
         _indicator?.Close();
         _toast?.Close();
     }

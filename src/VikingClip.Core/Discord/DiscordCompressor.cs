@@ -15,7 +15,10 @@ public static class DiscordCompressor
 
     public static bool NeedsCompression(long fileBytes, long limitBytes) => fileBytes > limitBytes * 0.98;
 
-    /// <summary>Chooses resolution/fps/bitrates so the output lands under the limit with margin.</summary>
+    /// <summary>
+    /// Chooses resolution/bitrates so the output lands under the limit with margin. Frame rate is kept
+    /// (60 fps stays 60 fps); resolution gives way first.
+    /// </summary>
     public static Plan MakePlan(double durationSeconds, long limitBytes, int srcWidth, int srcHeight, int srcFps)
     {
         durationSeconds = Math.Max(1, durationSeconds);
@@ -23,17 +26,15 @@ public static class DiscordCompressor
         var audioKbps = totalKbps >= 2500 ? 128 : totalKbps >= 800 ? 96 : 64;
         var videoKbps = (int)Math.Max(150, totalKbps - audioKbps);
 
-        var (height, fps) = videoKbps switch
+        var height = videoKbps switch
         {
-            >= 8000 => (1080, 60),
-            >= 4000 => (1080, 30),
-            >= 2500 => (720, 60),
-            >= 1200 => (720, 30),
-            >= 600 => (480, 30),
-            _ => (360, 30),
+            >= 7000 => 1080,
+            >= 3500 => 720,
+            >= 1500 => 540,
+            _ => 480,
         };
         height = Math.Min(height, srcHeight);
-        fps = Math.Min(fps, Math.Max(1, srcFps));
+        var fps = Math.Min(60, Math.Max(1, srcFps));
         var width = (int)Math.Round(srcWidth * (double)height / srcHeight / 2) * 2;
         height &= ~1;
         return new Plan(width, height, fps, videoKbps, audioKbps, limitBytes);

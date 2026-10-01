@@ -6,20 +6,22 @@
         ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="False"
         SizeToContent="Height" Width="340" WindowStartupLocation="Manual" Cursor="Hand">
     <Border x:Name="Root" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderStrongBrush}"
-            BorderThickness="1" CornerRadius="8" SnapsToDevicePixels="True" MouseLeftButtonUp="Root_Click">
+            BorderThickness="1" CornerRadius="8" Padding="12,10" SnapsToDevicePixels="True" MouseLeftButtonUp="Root_Click">
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="4" />
-                <ColumnDefinition />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition />
             </Grid.ColumnDefinitions>
-            <Border x:Name="Bar" Background="{StaticResource AccentBrush}" CornerRadius="8,0,0,8" />
-            <StackPanel Grid.Column="1" Margin="14,10,10,10">
+            <Border x:Name="GlyphWell" Width="28" Height="28" CornerRadius="14" Background="{StaticResource AccentDimBrush}"
+                    VerticalAlignment="Top" Margin="0,1,12,0">
+                <TextBlock x:Name="Glyph" Style="{StaticResource Icon}" FontSize="13" Text="&#xE73E;" Foreground="{StaticResource AccentBrush}" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
                 <TextBlock x:Name="TitleText" Style="{StaticResource Body}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                <TextBlock x:Name="DetailText" Style="{StaticResource Caption}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
-                <ProgressBar x:Name="ProgressBarEl" Margin="0,8,0,0" Minimum="0" Maximum="1" Visibility="Collapsed" />
+                <TextBlock x:Name="DetailText" Style="{StaticResource Caption}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"
+                           Typography.NumeralAlignment="Tabular" />
+                <ProgressBar x:Name="ProgressBarEl" Margin="0,8,0,2" Minimum="0" Maximum="1" Visibility="Collapsed" />
             </StackPanel>
-            <TextBlock x:Name="Glyph" Grid.Column="2" Style="{StaticResource Icon}" Margin="0,0,14,0" Text="&#xE73E;" Foreground="{StaticResource AccentBrush}" />
         </Grid>
     </Border>
 </Window>

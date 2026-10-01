@@ -7,7 +7,7 @@ Press **Alt+K** in any game. Clip the last 45 seconds, start a recording, or tak
 - **Alt+K panel** anywhere, including fullscreen games: **Clip** · **Record** · **Screenshot**.
 - **Replay buffer** that never re-encodes: the last N seconds (default 45, up to 10 minutes) already sit in RAM as video, so a clip is saved instantly.
 - **Game folders**: clips land in `Videos\VikingClip\<Game>\`. Games are recognised from Steam, Epic, Riot and a built-in list; anything else goes to `Desktop`.
-- **Discord**: add as many channels as you like (each is a webhook). Pick one in the panel; a copy is compressed to fit the server's upload limit (10 MB without boosts). Private channel = private clips.
+- **Discord**: add as many channels as you like (each is a webhook). Pick one in the panel and the clip goes there (and only there), compressed to fit the server's upload limit (10 MB without boosts). Private channel = private clips.
 - **Dual monitors**: every monitor is buffered; you clip the one you are on.
 - **Audio**: desktop audio + microphone, saved as three tracks (mix, desktop, mic).
 - **Light on FPS**: frames stay on the GPU and go straight to the hardware encoder (NVIDIA NVENC, AMD AMF, Intel Quick Sync). No code is injected into games, so no anti-cheat trouble.
@@ -26,11 +26,17 @@ Updates are automatic: when a new release is published here, every install downl
 | Hotkey (default) | What it does |
 |---|---|
 | **Alt+K** | Opens the panel: Clip · Record · Screenshot, then where to save. Keys `1-3` pick, `Esc` closes. |
-| Alt+F10 | Instant clip to your last-used destination (no panel). |
-| Alt+F9 | Start / stop a recording of the monitor you are on. |
-| Alt+F1 | Screenshot to your last-used destination. |
+| Alt+Shift+K | Instant clip to your last-used destination (no panel). |
+| Alt+Shift+V | Start a recording; press again to stop, then choose where it goes. |
+| Alt+Shift+S | Screenshot to your last-used destination. |
 
-All hotkeys can be changed in **Hotkeys**.
+All hotkeys can be changed in **Hotkeys** (the Alt+F-key combos NVIDIA uses are deliberately avoided).
+
+Good to know:
+
+- **Clips never overlap.** Clip, then clip again 5 seconds later: the second clip contains only those 5 seconds.
+- **Discord means Discord only.** Picking a channel posts the clip and keeps nothing on your PC; if the post fails, the clip is saved locally instead and you are told. Pick *This PC* to keep it.
+- **Quality:** native resolution, 60 fps, about 40 Mbps at 1080p (variable, so quiet scenes make small files). Copies posted to Discord are shrunk to the channel's limit at 60 fps.
 
 **Exclusive-fullscreen games** (older games with real exclusive fullscreen): the panel cannot draw inside the game without injecting code, so VikingClip alt-tabs the game out to show the panel and hands focus back when you are done. The clip is cut at the moment you pressed Alt+K, so it never contains the alt-tab. Borderless/windowed games (most modern games) just get the panel on top.
 
@@ -54,7 +60,7 @@ The webhook URL works like a password for that channel. VikingClip stores it enc
 
 - Windows 10 (2004+) or Windows 11, 64-bit. Nothing else to install.
 - Any GPU. A hardware encoder is used when available; otherwise a CPU encoder with a warning.
-- Discord webhooks are capped by the server's boost level (10 / 50 / 100 MB). A 45 s clip is compressed to about 720p30 to fit 10 MB.
+- Discord webhooks are capped by the server's boost level (10 / 50 / 100 MB). A 45 s clip is compressed to about 540p at 60 fps to fit 10 MB; a boosted server gets 720p/1080p.
 - HDR desktops are captured in SDR (colours may look flat in clips).
 - The REC badge, panel and notifications are excluded from captures.
 

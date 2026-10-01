@@ -11,13 +11,16 @@ public static class FfmpegArgs
 {
     public const string KeyframeExpr = "expr:isnan(prev_forced_t)+gte(t,prev_forced_t+1)";
 
-    /// <summary>Picks a bitrate that looks good for the resolution/fps actually captured.</summary>
+    /// <summary>
+    /// Target bitrate for the resolution/fps actually captured. 40 Mbps at 1080p60 is in ShadowPlay's "high"
+    /// territory; the encoders run VBR with a quality floor, so static content uses less and motion can peak above.
+    /// </summary>
     public static int AutoBitrateKbps(int width, int height, int fps)
     {
         var pixels = (double)width * height;
-        var basePer1080p60 = 20000.0;
+        var basePer1080p60 = 40000.0;
         var kbps = basePer1080p60 * (pixels / (1920.0 * 1080.0)) * Math.Pow(fps / 60.0, 0.6);
-        return (int)Math.Clamp(Math.Round(kbps / 500) * 500, 4000, 80000);
+        return (int)Math.Clamp(Math.Round(kbps / 500) * 500, 8000, 120000);
     }
 
     /// <summary>The long-running per-monitor capture: desktop → GPU encoder → fragmented MP4 on stdout.

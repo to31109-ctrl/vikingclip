@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using VikingClip.App.Services;
 using VikingClip.Core.Native;
@@ -16,7 +17,7 @@ public partial class ToastWindow : Window
     private readonly DispatcherTimer _hide = new();
     private Action? _onClick;
 
-    /// <summary>Dev snapshots: skip positioning.</summary>
+    /// <summary>Dev snapshots: skip positioning, capture exclusion and motion.</summary>
     public bool SnapshotMode { get; set; }
 
     public ToastWindow(Func<RECT> monitorRect, Func<bool> enabled)
@@ -26,7 +27,7 @@ public partial class ToastWindow : Window
         InitializeComponent();
         SourceInitialized += (_, _) =>
         {
-            if (SnapshotMode) return; // dev renders: plain invisible window, no capture exclusion
+            if (SnapshotMode) return;
             WindowNative.ExcludeFromCapture(this);
             WindowNative.MakeOverlay(this, noActivate: true);
         };
@@ -52,27 +53,33 @@ public partial class ToastWindow : Window
         TitleText.Text = title;
         DetailText.Text = detail ?? "";
         DetailText.Visibility = string.IsNullOrEmpty(detail) ? Visibility.Collapsed : Visibility.Visible;
-        var (bar, glyph) = kind switch
+        var (fg, well, glyph) = kind switch
         {
-            ToastKind.Success => ("AccentBrush", ""),
-            ToastKind.Error => ("DangerBrush", ""),
-            ToastKind.Progress => ("TextMutedBrush", ""),
-            _ => ("TextMutedBrush", ""),
+            ToastKind.Success => ("AccentBrush", "AccentDimBrush", ""),
+            ToastKind.Error => ("DangerBrush", "DangerDimBrush", ""),
+            ToastKind.Progress => ("TextMutedBrush", "Surface3Brush", ""),
+            _ => ("TextBrush", "Surface3Brush", ""),
         };
-        Bar.Background = (Brush)FindResource(bar);
         Glyph.Text = glyph;
-        Glyph.Foreground = (Brush)FindResource(bar);
+        Glyph.Foreground = (Brush)FindResource(fg);
+        GlyphWell.Background = (Brush)FindResource(well);
         ProgressBarEl.Visibility = kind == ToastKind.Progress ? Visibility.Visible : Visibility.Collapsed;
         ProgressBarEl.IsIndeterminate = kind == ToastKind.Progress && fraction is null;
         if (fraction is { } f) ProgressBarEl.Value = Math.Clamp(f, 0, 1);
         Cursor = onClick is null ? System.Windows.Input.Cursors.Arrow : System.Windows.Input.Cursors.Hand;
 
-        if (!IsVisible) Show();
+        var wasVisible = IsVisible;
+        if (!wasVisible)
+        {
+            Opacity = SnapshotMode ? 1 : 0;
+            Show();
+        }
         UpdateLayout();
         if (!SnapshotMode)
         {
             WindowNative.PlaceAtCorner(this, _monitor(), WindowNative.Corner.BottomRight, 24);
             WindowNative.Topmost(this);
+            if (!wasVisible) Enter();
         }
 
         _hide.Stop();
@@ -81,6 +88,17 @@ public partial class ToastWindow : Window
             _hide.Interval = d;
             _hide.Start();
         }
+    }
+
+    /// <summary>Fade + rise, exponential ease-out (the same motion language as the panel).</summary>
+    private void Enter()
+    {
+        var slide = new TranslateTransform(0, 8);
+        Root.RenderTransform = slide; // the Window itself cannot carry a RenderTransform
+        var ease = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 };
+        var d = TimeSpan.FromMilliseconds(180);
+        BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, d) { EasingFunction = ease });
+        slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(8, 0, d) { EasingFunction = ease });
     }
 
     private void Root_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)

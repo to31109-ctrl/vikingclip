@@ -140,7 +140,7 @@ public partial class LibraryPage : UserControl, IPage
         foreach (var ch in channels)
         {
             var mi = new MenuItem { Header = $"Send to {ch.Name}" };
-            mi.Click += (_, _) => _ = _app.Actions.PostToDiscordAsync(item.Entry.Path, ch, item.Entry.Meta, item.Game, null);
+            mi.Click += (_, _) => _ = _app.Actions.SendExistingToDiscordAsync(item.Entry.Path, ch, item.Entry.Meta, item.Game);
             menu.Items.Add(mi);
         }
         menu.PlacementTarget = (UIElement)sender;

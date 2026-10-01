@@ -24,15 +24,22 @@ public static class ClipWriter
         await ring.WaitForCoverageAsync(endTime, TimeSpan.FromSeconds(2.5), ct).ConfigureAwait(false);
 
         var from = endTime - lengthSeconds;
+        // Clips never overlap: a second clip shortly after the first only contains what happened since.
+        var continuing = capture.LastClipEnd > from && capture.LastClipEnd < endTime;
+        if (continuing) from = capture.LastClipEnd;
+
         var frags = ring.GetRange(from, endTime, out var truncated);
+        if (continuing) frags = frags.Where(f => f.Start >= from - 0.02).ToList(); // start at the first keyframe after the previous clip
         if (frags.Count == 0)
-            return ClipResult.Fail(capture.State == CaptureState.Running
-                ? "Nothing in the replay buffer yet - try again in a second."
-                : $"Capture is not running on this monitor ({capture.LastError ?? capture.State.ToString()}).");
+            return ClipResult.Fail(continuing
+                ? "Nothing new since the last clip yet."
+                : capture.State == CaptureState.Running
+                    ? "Nothing in the replay buffer yet - try again in a second."
+                    : $"Capture is not running on this monitor ({capture.LastError ?? capture.State.ToString()}).");
 
         var videoStart = frags[0].Start;
         var duration = endTime - videoStart;
-        if (duration < 0.3) return ClipResult.Fail("Clip would be shorter than a frame.");
+        if (duration < 0.5) return ClipResult.Fail(continuing ? "Nothing new since the last clip yet." : "Clip would be shorter than a frame.");
 
         var tmp = Paths.NewTempDir("clip");
         try
@@ -67,7 +74,8 @@ public static class ClipWriter
             }
 
             var size = new FileInfo(outputPath).Length;
-            Log.Info($"Clip saved {outputPath} ({duration:0.0}s, {size / 1024 / 1024} MB, exactTiming={frags[0].Init.HasExactTiming})");
+            capture.LastClipEnd = endTime;
+            Log.Info($"Clip saved {outputPath} ({duration:0.0}s, {size / 1024 / 1024} MB, exactTiming={frags[0].Init.HasExactTiming}{(continuing ? ", continued from previous clip" : "")})");
             return new ClipResult(true, outputPath, duration, size, null, truncated);
         }
         catch (Exception ex)

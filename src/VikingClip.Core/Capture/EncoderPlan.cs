@@ -40,16 +40,30 @@ public sealed record EncoderPlan(
         return ",hwdownload,format=bgra" + scale + ",format=nv12";
     }
 
+    /// <summary>
+    /// Quality-first settings: VBR around the target with headroom for motion, a constant-quality floor where the
+    /// encoder supports it, and no B-frames (clips are cut at any frame after a keyframe).
+    /// </summary>
     public IEnumerable<string> EncoderArgs(int kbps, int fps)
     {
-        var common = new[] { "-b:v", $"{kbps}k", "-maxrate", $"{kbps}k", "-bufsize", $"{kbps * 2}k", "-g", $"{fps}", "-bf", "0", "-profile:v", "high" };
+        var maxrate = $"{(int)(kbps * 1.5)}k";
+        var bufsize = $"{kbps * 3}k";
+        var common = new[] { "-g", $"{fps}", "-bf", "0", "-profile:v", "high" };
         var specific = Encoder switch
         {
-            "h264_nvenc" => new[] { "-preset", "p4", "-tune", "ll", "-rc", "cbr", "-multipass", "disabled", "-forced-idr", "1" },
-            "h264_amf" => new[] { "-usage", "lowlatency", "-quality", "balanced", "-rc", "cbr", "-forced_idr", "1" },
-            "h264_qsv" => new[] { "-preset", "veryfast", "-forced_idr", "1" },
-            "libx264" => new[] { "-preset", "veryfast", "-tune", "zerolatency" },
-            _ => Array.Empty<string>(),
+            "h264_nvenc" => new[]
+            {
+                "-preset", "p5", "-tune", "hq", "-rc", "vbr", "-cq", "19", "-b:v", $"{kbps}k", "-maxrate", maxrate, "-bufsize", bufsize,
+                "-multipass", "qres", "-spatial-aq", "1", "-aq-strength", "8", "-rc-lookahead", "16", "-forced-idr", "1",
+            },
+            "h264_amf" => new[]
+            {
+                "-usage", "transcoding", "-quality", "quality", "-rc", "vbr_peak", "-b:v", $"{kbps}k", "-maxrate", maxrate, "-bufsize", bufsize,
+                "-forced_idr", "1",
+            },
+            "h264_qsv" => new[] { "-preset", "medium", "-b:v", $"{kbps}k", "-maxrate", maxrate, "-bufsize", bufsize, "-forced_idr", "1" },
+            "libx264" => new[] { "-preset", "veryfast", "-tune", "zerolatency", "-crf", "20", "-maxrate", maxrate, "-bufsize", bufsize },
+            _ => new[] { "-b:v", $"{kbps}k" },
         };
         return common.Concat(specific);
     }

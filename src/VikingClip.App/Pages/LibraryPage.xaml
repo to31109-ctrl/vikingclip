@@ -44,7 +44,7 @@
                                                    Foreground="{StaticResource TextFaintBrush}" Visibility="{Binding Thumbnail, Converter={StaticResource NullCollapsed}, ConverterParameter=invert}" />
                                         <Border Background="#CC15181E" CornerRadius="4" Padding="6,2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8"
                                                 Visibility="{Binding DurationText, Converter={StaticResource NullCollapsed}}">
-                                            <TextBlock Text="{Binding DurationText}" Style="{StaticResource Caption}" Foreground="{StaticResource TextBrush}" FontFamily="{StaticResource MonoFont}" />
+                                            <TextBlock Text="{Binding DurationText}" Style="{StaticResource Caption}" Foreground="{StaticResource TextBrush}" Typography.NumeralAlignment="Tabular" />
                                         </Border>
                                         <Border Background="#CC15181E" CornerRadius="4" Padding="5,2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8">
                                             <TextBlock Text="{Binding KindText}" Style="{StaticResource Caption}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" />
@@ -57,7 +57,7 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Game}" Style="{StaticResource Body}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,0">
+                                            <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,0" Typography.NumeralAlignment="Tabular">
                                                 <Run Text="{Binding Created, Converter={StaticResource TimeAgo}, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Bytes, Converter={StaticResource Size}, Mode=OneWay}" />
                                             </TextBlock>
                                         </StackPanel>

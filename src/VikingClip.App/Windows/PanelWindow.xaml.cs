@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using VikingClip.App.Services;
 using VikingClip.Core.Logging;
@@ -19,8 +21,13 @@ public partial class PanelWindow : Window
     private readonly ActionController _controller;
     private Moment? _moment;
     private IntPtr _restoreTo;
-    private PanelAction? _pendingAction;
     private List<Destination> _destinations = new();
+    private Action<Destination>? _onPick;
+    private Action? _onDismiss;
+    private DateTime _shownAt;
+
+    /// <summary>Dev snapshots: skip positioning, focus stealing, capture exclusion and motion.</summary>
+    public bool SnapshotMode { get; set; }
 
     public PanelWindow(ActionController controller)
     {
@@ -28,7 +35,7 @@ public partial class PanelWindow : Window
         InitializeComponent();
         SourceInitialized += (_, _) =>
         {
-            if (SnapshotMode) return; // dev renders: plain invisible window, no capture exclusion
+            if (SnapshotMode) return;
             WindowNative.ExcludeFromCapture(this);
             WindowNative.MakeOverlay(this, noActivate: false);
         };
@@ -38,21 +45,34 @@ public partial class PanelWindow : Window
             // Clicking back into the game closes the panel - but don't fight the game for focus.
             // Ignore the activation churn right after showing (exclusive-fullscreen games minimize, etc.).
             if (IsVisible && (DateTime.UtcNow - _shownAt).TotalMilliseconds > 1200)
-                Dispatcher.BeginInvoke(() => { if (IsVisible && !IsActive) Hide(); }, DispatcherPriority.Background);
+                Dispatcher.BeginInvoke(() => { if (IsVisible && !IsActive) CloseAndRestore(restoreFocus: false); }, DispatcherPriority.Background);
         };
     }
 
-    private DateTime _shownAt;
+    // ---- showing ------------------------------------------------------------------------------
 
-    /// <summary>Dev snapshots: skip positioning and focus stealing.</summary>
-    public bool SnapshotMode { get; set; }
-
-    internal void ChooseForSnapshot(PanelAction action) => Choose(action);
-
+    /// <summary>Step 1: Clip · Record · Screenshot.</summary>
     public void ShowFor(Moment moment)
     {
+        Populate(moment);
+        ActionsStep.Visibility = Visibility.Visible;
+        DestinationStep.Visibility = Visibility.Collapsed;
+        Present();
+    }
+
+    /// <summary>Straight to "save to…" for something that already happened (a recording stopped by hotkey).</summary>
+    public void AskDestination(Moment moment, PanelAction action, Action<Destination> onPick, Action? onDismiss)
+    {
+        Populate(moment);
+        if (!ShowDestinations(action, onPick, onDismiss)) return; // decided without asking
+        Present();
+    }
+
+    private void Populate(Moment moment)
+    {
         _moment = moment;
-        _pendingAction = null;
+        _onPick = null;
+        _onDismiss = null;
         _restoreTo = moment.Foreground.Hwnd;
         _shownAt = DateTime.UtcNow;
 
@@ -65,22 +85,41 @@ public partial class PanelWindow : Window
             : moment.Capture.State != Core.Capture.CaptureState.Running
                 ? $"Capture: {moment.Capture.State}"
                 : "";
-        ActionsStep.Visibility = Visibility.Visible;
-        DestinationStep.Visibility = Visibility.Collapsed;
+    }
 
-        Show();
-        if (SnapshotMode) return;
-        if (moment.Monitor is not null)
+    private void Present()
+    {
+        if (!IsVisible)
         {
-            WindowNative.CenterOnMonitor(this, moment.Monitor.Bounds);
+            Opacity = SnapshotMode ? 1 : 0;
+            Show();
+        }
+        if (SnapshotMode) return;
+        if (_moment?.Monitor is { } mon)
+        {
+            WindowNative.CenterOnMonitor(this, mon.Bounds);
             // DPI change on the way to another monitor can resize us; settle once more.
-            Dispatcher.BeginInvoke(() => WindowNative.CenterOnMonitor(this, moment.Monitor.Bounds), DispatcherPriority.Loaded);
+            Dispatcher.BeginInvoke(() => WindowNative.CenterOnMonitor(this, mon.Bounds), DispatcherPriority.Loaded);
         }
         var hwnd = WindowNative.Handle(this);
         if (!User32.ForceForeground(hwnd)) Log.Warn("Panel could not take foreground");
         Activate();
         Focus();
         Keyboard.Focus(this);
+        Enter();
+    }
+
+    /// <summary>The one authored motion moment: a short fade + settle, exponential ease-out.
+    /// (Transforms go on the content: WPF does not allow a RenderTransform on the Window itself.)</summary>
+    private void Enter()
+    {
+        var scale = new ScaleTransform(0.97, 0.97);
+        Root.RenderTransform = scale;
+        var ease = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 };
+        var d = TimeSpan.FromMilliseconds(160);
+        BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, d) { EasingFunction = ease });
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.97, 1, d) { EasingFunction = ease });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.97, 1, d) { EasingFunction = ease });
     }
 
     private void RefreshRecordingState()
@@ -98,17 +137,21 @@ public partial class PanelWindow : Window
         }
     }
 
-    public void CloseAndRestore()
+    public void CloseAndRestore(bool restoreFocus = true)
     {
         if (!IsVisible) return;
         Hide();
+        var dismiss = _onDismiss;
+        _onDismiss = null;
+        _onPick = null;
         var target = _restoreTo;
         _restoreTo = IntPtr.Zero;
-        if (target != IntPtr.Zero && User32.IsWindow(target))
+        if (restoreFocus && target != IntPtr.Zero && User32.IsWindow(target))
         {
             // Give the game back its focus (and un-minimize it if the alt-tab minimized it).
             Dispatcher.BeginInvoke(() => User32.ForceForeground(target), DispatcherPriority.Background);
         }
+        dismiss?.Invoke();
     }
 
     // ---- step 1 -------------------------------------------------------------------------------
@@ -118,21 +161,48 @@ public partial class PanelWindow : Window
 
     private void Record_Click(object sender, RoutedEventArgs e)
     {
-        if (_controller.IsRecording) Choose(PanelAction.StopRecording);
-        else Run(PanelAction.Record, Destination.Local);
+        if (_controller.IsRecording)
+        {
+            // Stop at this instant; the file is written while the destination is chosen.
+            var pending = _controller.BeginStopRecording();
+            if (pending is null) { CloseAndRestore(); return; }
+            RefreshRecordingState();
+            ShowDestinations(PanelAction.StopRecording,
+                onPick: dest => _ = _controller.FinishRecordingAsync(pending, dest),
+                onDismiss: () => _ = _controller.FinishRecordingAsync(pending, Destination.Local));
+        }
+        else
+        {
+            Run(PanelAction.Record, Destination.Local);
+        }
     }
+
+    internal void ChooseForSnapshot(PanelAction action) => ShowDestinations(action, _ => { }, null, force: true);
 
     private void Choose(PanelAction action)
     {
         if (_moment is null) return;
+        ShowDestinations(action, onPick: dest => Run(action, dest), onDismiss: null);
+    }
+
+    /// <summary>
+    /// Shows the "save to" list, or decides immediately when there is only one option / the choice is remembered.
+    /// Returns true when the list is being shown.
+    /// </summary>
+    private bool ShowDestinations(PanelAction action, Action<Destination> onPick, Action? onDismiss, bool force = false)
+    {
         _destinations = _controller.Destinations();
         var s = App.Current.Settings.Current;
-        if (_destinations.Count == 1 || (s.RememberDestination && s.LastDestination is not null))
+        if (!force && (_destinations.Count == 1 || (s.RememberDestination && s.LastDestination is not null)))
         {
-            Run(action, _controller.DefaultDestination());
-            return;
+            var d = _controller.DefaultDestination();
+            CloseAndRestore();
+            onPick(d);
+            return false;
         }
-        _pendingAction = action;
+        _onPick = onPick;
+        _onDismiss = onDismiss;
+        Log.Debug($"Panel: asking destination for {action} ({_destinations.Count} options)");
         DestTitle.Text = action switch
         {
             PanelAction.Clip => "Save clip to",
@@ -140,22 +210,24 @@ public partial class PanelWindow : Window
             PanelAction.StopRecording => "Save recording to",
             _ => "Save to",
         };
+        BackButton.Visibility = action == PanelAction.StopRecording ? Visibility.Collapsed : Visibility.Visible;
         RememberBox.IsChecked = false;
         DestList.Items.Clear();
         for (var i = 0; i < _destinations.Count; i++)
             DestList.Items.Add(MakeDestinationRow(_destinations[i], i + 1));
         ActionsStep.Visibility = Visibility.Collapsed;
         DestinationStep.Visibility = Visibility.Visible;
+        return true;
     }
 
     private Button MakeDestinationRow(Destination d, int index)
     {
         var glyph = new TextBlock { Text = d.IsLocal ? "" : "", Style = (Style)FindResource("Icon"), Margin = new Thickness(0, 0, 12, 0) };
-        if (!d.IsLocal) glyph.Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        if (!d.IsLocal) glyph.Foreground = (Brush)FindResource("AccentBrush");
         var title = new TextBlock { Text = d.Label, Style = (Style)FindResource("Body") };
         var sub = new TextBlock
         {
-            Text = d.IsLocal ? $"Clips\\{_moment?.Game.FolderName}" : $"Discord · also saved on this PC · {d.Channel!.MaxUploadMB} MB limit",
+            Text = d.IsLocal ? $"Kept in Clips\\{_moment?.Game.FolderName}" : $"Discord only · fits {d.Channel!.MaxUploadMB} MB · nothing kept here",
             Style = (Style)FindResource("Caption"),
         };
         var text = new StackPanel();
@@ -178,15 +250,20 @@ public partial class PanelWindow : Window
 
     private void PickDestination(Destination d)
     {
-        if (_pendingAction is not { } action) return;
+        var cb = _onPick;
+        if (cb is null) return;
         if (RememberBox.IsChecked == true || d.Id != App.Current.Settings.Current.LastDestination)
             _controller.RememberDestination(d, RememberBox.IsChecked == true);
-        Run(action, d);
+        _onPick = null;
+        _onDismiss = null; // picking is not dismissing
+        CloseAndRestore();
+        cb(d);
     }
 
     private void Run(PanelAction action, Destination dest)
     {
         var m = _moment;
+        _onDismiss = null;
         CloseAndRestore();
         if (m is null) return;
         _ = _controller.ExecuteAsync(m, action, dest);
@@ -194,7 +271,9 @@ public partial class PanelWindow : Window
 
     private void Back_Click(object sender, RoutedEventArgs e)
     {
-        _pendingAction = null;
+        if (BackButton.Visibility != Visibility.Visible) return;
+        _onPick = null;
+        _onDismiss = null;
         DestinationStep.Visibility = Visibility.Collapsed;
         ActionsStep.Visibility = Visibility.Visible;
     }
@@ -203,8 +282,8 @@ public partial class PanelWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        Hide();
         _restoreTo = IntPtr.Zero;
+        CloseAndRestore(restoreFocus: false);
         App.Current.ShowMainWindow();
     }
 
@@ -216,7 +295,7 @@ public partial class PanelWindow : Window
         e.Handled = true;
         if (key == Key.Escape)
         {
-            if (DestinationStep.Visibility == Visibility.Visible) Back_Click(this, new RoutedEventArgs());
+            if (DestinationStep.Visibility == Visibility.Visible && BackButton.Visibility == Visibility.Visible) Back_Click(this, new RoutedEventArgs());
             else CloseAndRestore();
             return;
         }

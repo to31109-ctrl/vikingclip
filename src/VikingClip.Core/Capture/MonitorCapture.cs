@@ -40,6 +40,9 @@ public sealed partial class MonitorCapture : IDisposable
     public double MeasuredKbps { get; private set; }
     public bool HasExactTiming { get; private set; }
 
+    /// <summary>Engine time where the previous clip from this monitor ended; the next clip starts there so clips never overlap.</summary>
+    public double LastClipEnd { get; set; } = double.NegativeInfinity;
+
     public event Action<MonitorCapture>? StateChanged;
 
     public MonitorCapture(MonitorInfo monitor, EncoderPlan plan, CaptureClock clock, double ringSeconds, Func<CaptureParams> paramsProvider, bool gpuScalerAvailable)
