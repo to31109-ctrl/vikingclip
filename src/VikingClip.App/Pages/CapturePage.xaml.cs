@@ -12,7 +12,8 @@ public sealed record MonitorRow(string Title, string Detail, string State, Brush
 public partial class CapturePage : UserControl, IPage
 {
     private readonly App _app = App.Current;
-    private bool _loading;
+    // true until Load() ran once: WPF fires ValueChanged/SelectionChanged while the XAML is still being built.
+    private bool _loading = true;
     private AppSettings? _appliedSnapshot;
 
     public CapturePage()
@@ -36,7 +37,6 @@ public partial class CapturePage : UserControl, IPage
         _loading = true;
         var s = _app.Settings.Current;
         ClipLength.Value = s.ClipLengthSeconds;
-        ClipLengthText.Text = FileNames.HumanDuration(s.ClipLengthSeconds) + (s.ClipLengthSeconds < 60 ? "" : "") ;
         ClipLengthText.Text = s.ClipLengthSeconds < 60 ? $"{s.ClipLengthSeconds} s" : FileNames.HumanDuration(s.ClipLengthSeconds);
         Select(Quality, s.Capture.Quality.ToString());
         Select(Fps, s.Capture.Fps.ToString());
@@ -90,6 +90,7 @@ public partial class CapturePage : UserControl, IPage
 
     private void ClipLength_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (_loading) return;
         var v = (int)Math.Round(ClipLength.Value);
         ClipLengthText.Text = v < 60 ? $"{v} s" : FileNames.HumanDuration(v);
         Save(s => s.ClipLengthSeconds = v);

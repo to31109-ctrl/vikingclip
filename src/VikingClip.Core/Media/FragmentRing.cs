@@ -10,11 +10,22 @@ public sealed class FragmentRing
     private readonly object _gate = new();
     private long _bytes;
 
-    /// <summary>Seconds of video to keep (clip length plus a safety margin).</summary>
-    public double MaxSeconds { get; set; }
+    private double _maxSeconds;
 
-    /// <summary>Hard cap in case something goes wrong with timing.</summary>
-    public long MaxBytes { get; set; } = 3L * 1024 * 1024 * 1024;
+    /// <summary>Seconds of video to keep (clip length plus a safety margin).</summary>
+    public double MaxSeconds
+    {
+        get => _maxSeconds;
+        set
+        {
+            _maxSeconds = value;
+            // Hard byte cap in case timing ever goes wrong: generous for the configured length, never unbounded.
+            MaxBytes = Math.Max(200L * 1024 * 1024, EstimateBytes(value, 100_000));
+        }
+    }
+
+    /// <summary>Hard cap, derived from MaxSeconds (≈100 Mbps worth) so a timing bug can't eat all RAM. Settable for tests.</summary>
+    public long MaxBytes { get; set; }
 
     public event Action<Fragment>? FragmentAdded;
 

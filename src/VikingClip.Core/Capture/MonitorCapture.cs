@@ -71,8 +71,10 @@ public sealed partial class MonitorCapture : IDisposable
 
     public void Dispose() => Stop();
 
-    /// <summary>True when fragments arrived recently.</summary>
-    public bool IsHealthy => State == CaptureState.Running && _lastFragmentAt >= 0 && _clock.Now - _lastFragmentAt < 4;
+    /// <summary>True when fragments arrived recently (a fresh session gets a few seconds to produce its first one).</summary>
+    public bool IsHealthy =>
+        (State == CaptureState.Running && _lastFragmentAt >= 0 && _clock.Now - _lastFragmentAt < 4) ||
+        (State is CaptureState.Starting or CaptureState.Restarting && _clock.Now - _sessionStartedAt < 8);
 
     private void RunLoop()
     {

@@ -9,7 +9,7 @@ namespace VikingClip.App.Pages;
 public partial class AudioPage : UserControl, IPage
 {
     private readonly App _app = App.Current;
-    private bool _loading;
+    private bool _loading = true; // handlers fire during XAML load; see CapturePage
     private AppSettings? _applied;
 
     public AudioPage()
@@ -73,6 +73,7 @@ public partial class AudioPage : UserControl, IPage
 
     private void Gain_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (_loading) return;
         DesktopGainText.Text = $"{DesktopGain.Value:0}%";
         MicGainText.Text = $"{MicGain.Value:0}%";
         Save(a => { a.DesktopGain = (float)(DesktopGain.Value / 100); a.MicrophoneGain = (float)(MicGain.Value / 100); });
@@ -80,6 +81,7 @@ public partial class AudioPage : UserControl, IPage
 
     private void Offset_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (_loading) return;
         OffsetText.Text = $"{Offset.Value:+0;-0;0} ms";
         Save(a => a.OffsetMs = (int)Offset.Value);
     }

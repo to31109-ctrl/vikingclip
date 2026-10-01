@@ -76,6 +76,7 @@ public sealed class HotkeyService : IDisposable
         switch (msg)
         {
             case User32.WM_HOTKEY:
+                Log.Debug($"WM_HOTKEY id=0x{wParam.ToInt64():X}");
                 if (_idToName.TryGetValue(wParam.ToInt32(), out var name))
                 {
                     handled = true;

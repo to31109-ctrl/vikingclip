@@ -252,10 +252,32 @@ public sealed class CaptureEngine : IAsyncDisposable
 
     // ---- health -----------------------------------------------------------------------------
 
+    private int _watchdogTicks;
+
     private void Watchdog()
     {
         var caps = Captures;
         foreach (var c in caps) c.CheckWatchdog();
+
+        // Memory guard: the engine should sit at a few hundred MB. If something leaks, drop the buffers
+        // rather than let the process (and the page file) grow without bound.
+        if (++_watchdogTicks % 10 == 0)
+        {
+            try
+            {
+                var privateBytes = System.Diagnostics.Process.GetCurrentProcess().PrivateMemorySize64;
+                if (privateBytes > 3L * 1024 * 1024 * 1024)
+                {
+                    Log.Error($"Memory guard: process uses {privateBytes / 1024 / 1024} MB (buffers {EstimatedRamBytes / 1024 / 1024} MB); clearing replay buffers");
+                    foreach (var c in caps) c.Ring.Clear();
+                    _desktopRing.Clear();
+                    _micRing.Clear();
+                    GC.Collect();
+                    Warnings.Add("Memory guard tripped: replay buffers were cleared once. If this repeats, please report it with the log.");
+                }
+            }
+            catch { }
+        }
         if (State is EngineState.Stopped or EngineState.Starting or EngineState.Failed) return;
         var healthy = caps.Count(c => c.IsHealthy);
         var next = healthy == caps.Count ? EngineState.Running : healthy == 0 ? EngineState.Degraded : EngineState.Degraded;

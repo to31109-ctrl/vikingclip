@@ -34,10 +34,12 @@ public sealed class AudioSettings
 
 public sealed class HotkeySettings
 {
+    // Alt+F10/F9/F1 are NVIDIA's defaults and already taken on PCs with the NVIDIA app, so the
+    // instant actions use Alt+Shift combos out of the box.
     public string Panel { get; set; } = "Alt+K";
-    public string InstantClip { get; set; } = "Alt+F10";
-    public string ToggleRecording { get; set; } = "Alt+F9";
-    public string Screenshot { get; set; } = "Alt+F1";
+    public string InstantClip { get; set; } = "Alt+Shift+K";
+    public string ToggleRecording { get; set; } = "Alt+Shift+V";
+    public string Screenshot { get; set; } = "Alt+Shift+S";
 }
 
 public sealed class DiscordChannel

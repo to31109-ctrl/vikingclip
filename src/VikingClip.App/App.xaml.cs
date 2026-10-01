@@ -67,7 +67,9 @@ public partial class App : Application
         ApplyHotkeys();
         Settings.Changed += _ => Dispatcher.BeginInvoke(ApplyHotkeys);
 
-        if (Settings.Current.LaunchAtLogin) AutoStart.Set(true, Program.LauncherExePath);
+        // Only installed builds register for auto-start; a dev build must not start itself at login.
+        if (Settings.Current.LaunchAtLogin && Updates.IsInstalled) AutoStart.Set(true, Program.LauncherExePath);
+        else if (!Updates.IsInstalled) Log.Info("Dev build: auto-start not registered");
 
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, Program.ShowWindowEventName);
         _showWait = ThreadPool.RegisterWaitForSingleObject(_showEvent, (_, _) => Dispatcher.BeginInvoke(ShowMainWindow), null, -1, false);
@@ -80,9 +82,14 @@ public partial class App : Application
         if (firstRun) Settings.Update(s => s.FirstRunCompleted = true);
     }
 
+    private string? _appliedHotkeys;
+
     public void ApplyHotkeys()
     {
         var s = Settings.Current;
+        var signature = string.Join("|", s.Hotkeys.Panel, s.Hotkeys.InstantClip, s.Hotkeys.ToggleRecording, s.Hotkeys.Screenshot);
+        if (signature == _appliedHotkeys) return; // settings saved for another reason
+        _appliedHotkeys = signature;
         HotkeyProblems.Clear();
         foreach (var (name, hk) in new[]
                  {

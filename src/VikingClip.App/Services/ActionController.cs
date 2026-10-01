@@ -238,6 +238,12 @@ public sealed class ActionController
         var s = Settings.Current;
         var path = FileNames.BuildOutputPath(s.ClipsRoot, m.Game.FolderName, $"{m.Game.Label} Recording", ".mp4", m.When);
         _recording = Engine.StartRecording(m.Capture, path, m.Game.Label);
+        _recording.LowDiskSpace += (rec, reason) => _app.Dispatcher.BeginInvoke(async () =>
+        {
+            if (!ReferenceEquals(rec, _recording)) return;
+            Toast.Show(ToastKind.Error, "Recording stopped", reason + " - saving what was recorded.", duration: TimeSpan.FromSeconds(8));
+            await StopRecordingAsync(null);
+        });
         _recordingGame = m.Game;
         _recordingMonitor = m.Monitor;
         RecordingChanged?.Invoke();

@@ -113,16 +113,39 @@ public sealed class ClipLibrary
                 list.Add(new ClipEntry { Path = file, Meta = meta, Created = fi.CreationTime, Bytes = fi.Length });
             }
         }
-        return list.OrderByDescending(e => e.Created).ToList();
+        var result = list.OrderByDescending(e => e.Created).ToList();
+        PruneThumbnails(result);
+        return result;
     }
+
+    /// <summary>Deletes cached thumbnails whose clip is gone or changed, so the cache never grows beyond the library.</summary>
+    private static void PruneThumbnails(List<ClipEntry> entries)
+    {
+        try
+        {
+            var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var e in entries)
+            {
+                if (e.Meta.Kind == MediaKind.Screenshot) continue;
+                keep.Add(ThumbKey(e.Path) + ".jpg");
+            }
+            foreach (var f in Directory.EnumerateFiles(Paths.ThumbnailsDir, "*.jpg"))
+            {
+                if (!keep.Contains(Path.GetFileName(f))) File.Delete(f);
+            }
+        }
+        catch (Exception ex) { Log.Debug("Thumbnail prune skipped: " + ex.Message); }
+    }
+
+    private static string ThumbKey(string path) =>
+        Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(path + File.GetLastWriteTimeUtc(path).Ticks)));
 
     public async Task<string?> EnsureThumbnailAsync(ClipEntry entry, CancellationToken ct = default)
     {
         try
         {
             if (entry.Meta.Kind == MediaKind.Screenshot) return entry.Path;
-            var key = Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(entry.Path + File.GetLastWriteTimeUtc(entry.Path).Ticks)));
-            var thumb = Path.Combine(Paths.ThumbnailsDir, key + ".jpg");
+            var thumb = Path.Combine(Paths.ThumbnailsDir, ThumbKey(entry.Path) + ".jpg");
             if (File.Exists(thumb)) return thumb;
             var at = entry.Meta.DurationSeconds > 2 ? Math.Min(1.0, entry.Meta.DurationSeconds / 2) : 0;
             var r = await Ffmpeg.RunAsync(FfmpegArgs.Thumbnail(entry.Path, thumb, at), TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);

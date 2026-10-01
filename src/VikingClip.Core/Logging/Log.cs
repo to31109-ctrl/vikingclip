@@ -23,11 +23,16 @@ public static class Log
     public static void Warn(string message) => Write(LogLevel.Warn, message);
 
     public static void Error(string message, Exception? ex = null) =>
-        Write(LogLevel.Error, ex is null ? message : $"{message}: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+        Write(LogLevel.Error, ex is null ? message : $"{message}: {ex}");
 
     public static IReadOnlyList<LogEntry> RecentEntries => Recent.ToArray();
 
     public static string CurrentLogFile => Path.Combine(Paths.LogsDir, $"vikingclip-{DateTime.Now:yyyyMMdd}.log");
+
+    private const long MaxFileBytes = 40L * 1024 * 1024;
+    private static string? _lastMessage;
+    private static int _repeatCount;
+    private static long _writtenBytes;
 
     private static void Write(LogLevel level, string message)
     {
@@ -42,15 +47,35 @@ public static class Log
         {
             try
             {
+                // A repeating error (e.g. a layout exception WPF re-throws every frame) must not flood the disk.
+                if (message == _lastMessage)
+                {
+                    _repeatCount++;
+                    return;
+                }
                 var date = DateTime.Now.ToString("yyyyMMdd");
                 if (_writer is null || _writerDate != date)
                 {
                     _writer?.Dispose();
                     _writerDate = date;
-                    _writer = new StreamWriter(CurrentLogFile, append: true, Encoding.UTF8) { AutoFlush = true };
+                    var fi = new FileInfo(CurrentLogFile);
+                    _writtenBytes = fi.Exists ? fi.Length : 0;
+                    // Shared read so the file can be opened/tailed while the app runs.
+                    var stream = new FileStream(CurrentLogFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                    _writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
                     CleanupOldLogs();
                 }
+                if (_repeatCount > 0)
+                {
+                    _writer.WriteLine($"{entry.Time:HH:mm:ss.fff} [Info ] (previous message repeated {_repeatCount} more times)");
+                    _repeatCount = 0;
+                }
+                _lastMessage = message;
+                if (_writtenBytes > MaxFileBytes) return; // keep the in-memory buffer, stop growing the file
                 _writer.WriteLine(line);
+                _writtenBytes += line.Length + 2;
+                if (_writtenBytes > MaxFileBytes)
+                    _writer.WriteLine($"{entry.Time:HH:mm:ss.fff} [Warn ] Log file reached {MaxFileBytes / 1024 / 1024} MB; further lines are dropped today.");
             }
             catch
             {

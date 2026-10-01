@@ -45,6 +45,36 @@ public sealed class RecordingSession : IDisposable
     public double Elapsed => Math.Max(0, _clock.Now - (_audioStart ?? RequestedStart));
     public MonitorCapture Capture => _capture;
 
+    /// <summary>Bytes written to the temp parts so far (what the recording costs on disk right now).</summary>
+    public long BytesOnDisk { get { lock (_gate) return _parts.Sum(p => p.Stream.Length) + (_desktopPcm?.Length ?? 0) + (_micPcm?.Length ?? 0); } }
+
+    /// <summary>Raised from a timer when the temp or output drive drops under the reserve; the owner should stop the recording.</summary>
+    public event Action<RecordingSession, string>? LowDiskSpace;
+
+    public const long DiskReserveBytes = 2L * 1024 * 1024 * 1024;
+    private Timer? _diskTimer;
+
+    private void CheckDisk()
+    {
+        try
+        {
+            if (_stopped) return;
+            foreach (var path in new[] { _tmp, Path.GetDirectoryName(OutputPath)! }.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var root = Path.GetPathRoot(Path.GetFullPath(path));
+                if (string.IsNullOrEmpty(root)) continue;
+                var free = new DriveInfo(root).AvailableFreeSpace;
+                if (free < DiskReserveBytes)
+                {
+                    Log.Warn($"Recording: drive {root} has only {free / 1024 / 1024} MB free; stopping");
+                    LowDiskSpace?.Invoke(this, $"Drive {root} is almost full ({free / 1024 / 1024} MB left)");
+                    return;
+                }
+            }
+        }
+        catch { }
+    }
+
     public RecordingSession(MonitorCapture capture, AudioSource? desktop, AudioSource? mic, AudioSettings audio, CaptureClock clock, string outputPath, string gameLabel)
     {
         _capture = capture;
@@ -60,6 +90,7 @@ public sealed class RecordingSession : IDisposable
         capture.Ring.FragmentAdded += OnFragment;
         if (desktop is not null) desktop.ChunkCaptured += OnDesktopChunk;
         if (mic is not null) mic.ChunkCaptured += OnMicChunk;
+        _diskTimer = new Timer(_ => CheckDisk(), null, 2000, 5000);
         Log.Info($"Recording started on {capture.Monitor.DeviceName} -> {outputPath}");
     }
 
@@ -144,6 +175,7 @@ public sealed class RecordingSession : IDisposable
         _capture.Ring.FragmentAdded -= OnFragment;
         if (_desktop is not null) _desktop.ChunkCaptured -= OnDesktopChunk;
         if (_mic is not null) _mic.ChunkCaptured -= OnMicChunk;
+        _diskTimer?.Dispose();
 
         try
         {

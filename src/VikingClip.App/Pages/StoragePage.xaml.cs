@@ -84,7 +84,7 @@ public partial class StoragePage : UserControl, IPage
             s.CheckForUpdates = CheckUpdates.IsChecked == true;
             s.RememberDestination = Remember.IsChecked == true;
         });
-        AutoStart.Set(_app.Settings.Current.LaunchAtLogin, Program.LauncherExePath);
+        if (_app.Updates.IsInstalled) AutoStart.Set(_app.Settings.Current.LaunchAtLogin, Program.LauncherExePath);
         _app.Updates.Start(_app.Settings.Current.CheckForUpdates);
     }
 
