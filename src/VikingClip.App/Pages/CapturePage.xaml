@@ -1,0 +1,120 @@
+<UserControl x:Class="VikingClip.App.Pages.CapturePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Padding="28,22,28,20">
+        <StackPanel MaxWidth="760" HorizontalAlignment="Left">
+            <TextBlock Text="Capture" Style="{StaticResource H1}" />
+            <TextBlock Text="The replay buffer runs all the time on the GPU encoder. Auto picks what works on this PC." Style="{StaticResource Muted}" Margin="0,2,0,18" />
+
+            <Border x:Name="RestartBar" Style="{StaticResource CardFlat}" Padding="14,10" Margin="0,0,0,14" Visibility="Collapsed" BorderBrush="{StaticResource AccentBrush}">
+                <Grid>
+                    <TextBlock Text="Capture settings changed. Restart capture to apply them." Style="{StaticResource Body}" VerticalAlignment="Center" />
+                    <Button Style="{StaticResource PrimaryButton}" Content="Restart capture" HorizontalAlignment="Right" Click="Restart_Click" />
+                </Grid>
+            </Border>
+
+            <!-- Clip length -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <Grid>
+                        <TextBlock Text="Clip length" Style="{StaticResource H2}" />
+                        <TextBlock x:Name="ClipLengthText" Text="45 s" Style="{StaticResource H2}" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right" />
+                    </Grid>
+                    <TextBlock Text="How far back a clip reaches when you press Clip." Style="{StaticResource Caption}" Margin="0,2,0,10" />
+                    <Slider x:Name="ClipLength" Minimum="5" Maximum="600" TickFrequency="5" IsSnapToTickEnabled="True" ValueChanged="ClipLength_Changed" />
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Content="15 s" Tag="15" Click="Preset_Click" Padding="10,4" Margin="0,0,6,0" />
+                        <Button Content="30 s" Tag="30" Click="Preset_Click" Padding="10,4" Margin="0,0,6,0" />
+                        <Button Content="45 s" Tag="45" Click="Preset_Click" Padding="10,4" Margin="0,0,6,0" />
+                        <Button Content="1 min" Tag="60" Click="Preset_Click" Padding="10,4" Margin="0,0,6,0" />
+                        <Button Content="2 min" Tag="120" Click="Preset_Click" Padding="10,4" Margin="0,0,6,0" />
+                        <Button Content="5 min" Tag="300" Click="Preset_Click" Padding="10,4" Margin="0,0,6,0" />
+                        <TextBlock x:Name="RamText" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="10,0,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Quality -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="Quality" Style="{StaticResource H2}" Margin="0,0,0,12" />
+                    <UniformGrid Columns="2" Margin="0,0,0,4">
+                        <StackPanel Margin="0,0,10,12">
+                            <TextBlock Text="Mode" Style="{StaticResource Label}" />
+                            <ComboBox x:Name="Quality" SelectionChanged="Setting_Changed">
+                                <ComboBoxItem Content="Auto (native resolution, recommended)" Tag="Auto" />
+                                <ComboBoxItem Content="Custom" Tag="Custom" />
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Margin="10,0,0,12">
+                            <TextBlock Text="Frame rate" Style="{StaticResource Label}" />
+                            <ComboBox x:Name="Fps" SelectionChanged="Setting_Changed">
+                                <ComboBoxItem Content="30 fps" Tag="30" />
+                                <ComboBoxItem Content="60 fps" Tag="60" />
+                                <ComboBoxItem Content="120 fps" Tag="120" />
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,10,12">
+                            <TextBlock Text="Max resolution (Custom)" Style="{StaticResource Label}" />
+                            <ComboBox x:Name="MaxHeight" SelectionChanged="Setting_Changed">
+                                <ComboBoxItem Content="Native" Tag="0" />
+                                <ComboBoxItem Content="1440p" Tag="1440" />
+                                <ComboBoxItem Content="1080p" Tag="1080" />
+                                <ComboBoxItem Content="720p" Tag="720" />
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Margin="10,0,0,12">
+                            <TextBlock Text="Bitrate in kbps (Custom, 0 = auto)" Style="{StaticResource Label}" />
+                            <TextBox x:Name="Bitrate" LostFocus="Bitrate_Changed" KeyDown="Bitrate_KeyDown" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,10,0">
+                            <TextBlock Text="Monitors" Style="{StaticResource Label}" />
+                            <ComboBox x:Name="Monitors" SelectionChanged="Setting_Changed">
+                                <ComboBoxItem Content="All monitors (clip the one you're on)" Tag="All" />
+                                <ComboBoxItem Content="Primary monitor only" Tag="PrimaryOnly" />
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Margin="10,0,0,0">
+                            <TextBlock Text="Encoder" Style="{StaticResource Label}" />
+                            <ComboBox x:Name="Encoder" SelectionChanged="Setting_Changed" />
+                        </StackPanel>
+                    </UniformGrid>
+                    <TextBlock Text="Downscaling below native resolution uses a CPU copy of each frame; leave Auto unless you need smaller files." Style="{StaticResource Caption}" Margin="0,8,0,12" />
+                    <CheckBox x:Name="DrawCursor" Content="Show the mouse cursor in clips" Checked="Toggle_Changed" Unchecked="Toggle_Changed" Margin="0,0,0,10" />
+                    <CheckBox x:Name="Indicator" Content="Show a REC badge while recording (never captured)" Checked="Toggle_Changed" Unchecked="Toggle_Changed" />
+                </StackPanel>
+            </Border>
+
+            <!-- Status -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,10">
+                        <TextBlock Text="Status" Style="{StaticResource H2}" />
+                        <Button Content="Restart capture" HorizontalAlignment="Right" Padding="10,4" Click="Restart_Click" />
+                    </Grid>
+                    <TextBlock x:Name="EngineText" Style="{StaticResource Body}" Margin="0,0,0,8" />
+                    <ItemsControl x:Name="MonitorList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource CardFlat}" Padding="12,10" Margin="0,0,0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource Body}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding State}" Style="{StaticResource Caption}" Foreground="{Binding StateBrush}" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock x:Name="WarningsText" Style="{StaticResource Caption}" Foreground="{StaticResource WarningBrush}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

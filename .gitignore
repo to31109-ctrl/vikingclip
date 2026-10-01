@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+publish/
+releases/
+TestResults/
+*.binlog
+
+# IDE
+.vs/
+.idea/
+*.user
+*.suo
+*.swp
+.DS_Store
+
+# Bundled ffmpeg is downloaded by tools/get-ffmpeg.ps1, never committed (190 MB)
+src/VikingClip.App/ffmpeg/
+
+# Local settings / logs / secrets — webhook URLs live in %LocalAppData%, never here
+*.log
+*.local.json

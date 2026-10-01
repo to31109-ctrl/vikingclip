@@ -1,0 +1,11 @@
+* text=auto
+*.cs text diff=csharp
+*.xaml text
+*.ps1 text
+*.md text
+*.yml text
+*.json text
+*.png binary
+*.ico binary
+*.mp4 binary
+*.wav binary

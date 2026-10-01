@@ -1,0 +1,23 @@
+<Project>
+  <!-- Shared settings for every project in the solution. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <!-- Overridden by the release workflow with -p:Version=x.y.z (from the git tag). -->
+    <Version>0.1.0</Version>
+    <Product>VikingClip</Product>
+    <Company>VikingClip</Company>
+    <Authors>VikingClip contributors</Authors>
+    <Copyright>GPL-3.0-or-later</Copyright>
+    <RepositoryUrl>https://github.com/to31109-ctrl/vikingclip</RepositoryUrl>
+  </PropertyGroup>
+</Project>

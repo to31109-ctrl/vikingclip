@@ -1,0 +1,70 @@
+# Builds the installer and publishes it to GitHub Releases. Every installed copy of VikingClip
+# checks these releases and updates itself.
+#
+# Two ways to release:
+#   1. push a tag:        git tag v0.2.0 && git push origin v0.2.0
+#   2. Actions → Release → Run workflow → type the version (e.g. 0.2.0)
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 0.2.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Resolve version
+        id: v
+        shell: pwsh
+        run: |
+          $v = if ('${{ github.event_name }}' -eq 'workflow_dispatch') { '${{ inputs.version }}' } else { '${{ github.ref_name }}'.TrimStart('v') }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Version must look like 1.2.3 (got '$v')" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Releasing $v"
+
+      - name: Fetch pinned ffmpeg
+        shell: pwsh
+        run: ./tools/get-ffmpeg.ps1
+
+      - name: Test
+        run: dotnet test tests/VikingClip.Core.Tests/VikingClip.Core.Tests.csproj -c Release --nologo
+
+      - name: Publish (self-contained, win-x64)
+        run: >
+          dotnet publish src/VikingClip.App/VikingClip.App.csproj -c Release -r win-x64 --self-contained
+          -o publish -p:Version=${{ steps.v.outputs.version }} --nologo
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk --version 1.2.161
+
+      - name: Download previous release (for delta updates)
+        continue-on-error: true
+        run: vpk download github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }} --outputDir releases
+
+      - name: Pack installer
+        run: >
+          vpk pack --packId VikingClip --packVersion ${{ steps.v.outputs.version }} --packDir publish
+          --mainExe VikingClip.exe --packTitle VikingClip --packAuthors "VikingClip contributors"
+          --icon assets/icon.ico --outputDir releases
+
+      - name: Upload to GitHub Releases
+        run: >
+          vpk upload github --repoUrl https://github.com/${{ github.repository }} --publish
+          --releaseName "VikingClip ${{ steps.v.outputs.version }}" --tag v${{ steps.v.outputs.version }}
+          --token ${{ secrets.GITHUB_TOKEN }} --outputDir releases

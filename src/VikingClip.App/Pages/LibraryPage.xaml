@@ -1,0 +1,78 @@
+<UserControl x:Class="VikingClip.App.Pages.LibraryPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="clr-namespace:VikingClip.App">
+    <UserControl.Resources>
+        <app:HumanSizeConverter x:Key="Size" />
+        <app:HumanDurationConverter x:Key="Duration" />
+        <app:TimeAgoConverter x:Key="TimeAgo" />
+        <app:NullToCollapsedConverter x:Key="NullCollapsed" />
+    </UserControl.Resources>
+    <DockPanel Margin="28,22,28,0">
+        <Grid DockPanel.Dock="Top" Margin="0,0,0,18">
+            <StackPanel>
+                <TextBlock Text="Library" Style="{StaticResource H1}" />
+                <TextBlock x:Name="SubtitleText" Text="Clips, recordings and screenshots" Style="{StaticResource Muted}" Margin="0,2,0,0" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <ComboBox x:Name="GameFilter" MinWidth="170" Margin="0,0,8,0" SelectionChanged="GameFilter_Changed" />
+                <Button Style="{StaticResource IconButton}" Content="&#xE72C;" ToolTip="Refresh" Click="Refresh_Click" Margin="0,0,4,0" />
+                <Button Content="Open folder" Click="OpenFolder_Click" />
+            </StackPanel>
+        </Grid>
+
+        <Grid>
+            <TextBlock x:Name="EmptyText" Style="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       TextAlignment="Center" Visibility="Collapsed" FontSize="14">
+                <Run Text="Nothing here yet." /><LineBreak />
+                <Run x:Name="EmptyHint" Text="Press Alt+K in a game and hit Clip." />
+            </TextBlock>
+            <ScrollViewer x:Name="Scroller" Padding="0,0,8,0">
+                <ItemsControl x:Name="Items">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource Card}" Padding="0" Width="276" Margin="0,0,14,14" ClipToBounds="True">
+                                <StackPanel>
+                                    <Grid Height="155" Background="{StaticResource Surface2Brush}" Cursor="Hand" MouseLeftButtonUp="Thumb_Click">
+                                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                        <TextBlock Text="{Binding KindGlyph}" Style="{StaticResource Icon}" FontSize="26"
+                                                   Foreground="{StaticResource TextFaintBrush}" Visibility="{Binding Thumbnail, Converter={StaticResource NullCollapsed}, ConverterParameter=invert}" />
+                                        <Border Background="#CC15181E" CornerRadius="4" Padding="6,2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8"
+                                                Visibility="{Binding DurationText, Converter={StaticResource NullCollapsed}}">
+                                            <TextBlock Text="{Binding DurationText}" Style="{StaticResource Caption}" Foreground="{StaticResource TextBrush}" FontFamily="{StaticResource MonoFont}" />
+                                        </Border>
+                                        <Border Background="#CC15181E" CornerRadius="4" Padding="5,2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8">
+                                            <TextBlock Text="{Binding KindText}" Style="{StaticResource Caption}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" />
+                                        </Border>
+                                    </Grid>
+                                    <Grid Margin="12,10,8,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Game}" Style="{StaticResource Body}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,0">
+                                                <Run Text="{Binding Created, Converter={StaticResource TimeAgo}, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Bytes, Converter={StaticResource Size}, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <Button Style="{StaticResource IconButton}" Content="&#xE768;" ToolTip="Play" Click="Play_Click" />
+                                            <Button Style="{StaticResource IconButton}" Content="&#xE8BD;" ToolTip="Send to Discord" Click="Discord_Click" />
+                                            <Button Style="{StaticResource IconButton}" Content="&#xE712;" ToolTip="More" Click="More_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</UserControl>

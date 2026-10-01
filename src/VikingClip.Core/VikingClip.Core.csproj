@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>VikingClip.Core</RootNamespace>
+    <Description>VikingClip capture engine: GPU screen capture via ffmpeg, in-memory replay buffer, audio, game detection, Discord upload.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NAudio 3.x targets .NET 9+; 2.2.1 is the last release for .NET 8. -->
+    <PackageReference Include="NAudio.Core" Version="2.2.1" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.31" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Curated exe -> game name list. Friends can extend it; see Games/known-games.json. -->
+    <EmbeddedResource Include="Games\known-games.json" LogicalName="known-games.json" />
+  </ItemGroup>
+
+</Project>

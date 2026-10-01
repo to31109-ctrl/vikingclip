@@ -1,0 +1,79 @@
+<UserControl x:Class="VikingClip.App.Pages.StoragePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Padding="28,22,28,20">
+        <StackPanel MaxWidth="760" HorizontalAlignment="Left">
+            <TextBlock Text="Storage &amp; games" Style="{StaticResource H1}" />
+            <TextBlock Text="Where clips go, how games are sorted into folders, and how the app starts." Style="{StaticResource Muted}" Margin="0,2,0,18" />
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="Clips folder" Style="{StaticResource H2}" />
+                    <TextBlock Text="Each game gets its own subfolder. Anything that isn't a game goes to Desktop." Style="{StaticResource Caption}" Margin="0,2,0,10" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="RootBox" IsReadOnly="True" />
+                        <Button Grid.Column="1" Content="Change…" Margin="8,0,0,0" Click="Browse_Click" />
+                        <Button Grid.Column="2" Content="Open" Margin="8,0,0,0" Click="Open_Click" />
+                    </Grid>
+                    <ItemsControl x:Name="UsageList" Margin="0,12,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Game}" Style="{StaticResource Body}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <ProgressBar Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Fraction, Mode=OneWay}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Text}" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="Startup &amp; behaviour" Style="{StaticResource H2}" Margin="0,0,0,12" />
+                    <CheckBox x:Name="LaunchAtLogin" Content="Start VikingClip when I sign in to Windows" Margin="0,0,0,10" Checked="Toggle_Changed" Unchecked="Toggle_Changed" />
+                    <CheckBox x:Name="StartMinimized" Content="Start in the background (tray icon only)" Margin="0,0,0,10" Checked="Toggle_Changed" Unchecked="Toggle_Changed" />
+                    <CheckBox x:Name="ShowToasts" Content="Show a small notification when something is saved or posted" Margin="0,0,0,10" Checked="Toggle_Changed" Unchecked="Toggle_Changed" />
+                    <CheckBox x:Name="CheckUpdates" Content="Install updates from GitHub automatically" Margin="0,0,0,10" Checked="Toggle_Changed" Unchecked="Toggle_Changed" />
+                    <Grid>
+                        <CheckBox x:Name="Remember" Content="Skip the 'save to' step and reuse my last choice" Checked="Toggle_Changed" Unchecked="Toggle_Changed" />
+                        <TextBlock x:Name="RememberText" Style="{StaticResource Caption}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Game names" Style="{StaticResource H2}" />
+                    <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,10"
+                               Text="Games are recognised from Steam, Epic, Riot and a built-in list. If one lands in the wrong folder, fix it here by its exe name." />
+                    <ItemsControl x:Name="OverrideList" />
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="NewExe" ToolTip="Exe name, e.g. coolgame.exe" Margin="0,0,8,0" />
+                        <TextBox x:Name="NewGameName" Grid.Column="1" ToolTip="Folder name to use" Margin="0,0,8,0" />
+                        <CheckBox x:Name="NewNotGame" Grid.Column="2" Content="Not a game" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <Button Grid.Column="3" Content="Add" Click="AddOverride_Click" />
+                    </Grid>
+                    <TextBlock x:Name="ForegroundHint" Style="{StaticResource Caption}" Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
